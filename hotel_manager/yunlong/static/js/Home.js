@@ -18,10 +18,12 @@ function openRefresh(){
 	let year=d.getFullYear();
 	let month=d.getMonth()+1;
 	let day=d.getDate();
-	let date=year+"-"+month+"-"+day;
+	date=year+"-"+month+"-"+day;
+	date=formatDate(date)
 	let item=document.getElementById("select_date");
+
 	item.value=date;
-	refresh(date)
+	refresh(date);
 }
 
 //给每一个房间添加插入删除按钮
@@ -57,6 +59,7 @@ function addInsertDeleteButton(){
 
 //插入房间基本操作
 function insertRoom(room,date){
+	date=formatDate(date)
 	var truthBeTold = window.confirm("日期："+date+"\n房间号："+room+"\n确认预定？")
 	if (truthBeTold) {
 		post = getHttpObject();
@@ -87,6 +90,7 @@ function insertRoom(room,date){
 
 //删除房间基本操作
 function deleteRoom(room,date){
+	date=formatDate(date)
 	var truthBeTold = window.confirm("日期："+date+"\n房间号："+room+"\n确认取消预定？")
 	if (truthBeTold) {
 		post = getHttpObject();
@@ -97,7 +101,6 @@ function deleteRoom(room,date){
 			"date": date,
 			"Room": room
 		}));
-
 		post.onreadystatechange = function () {
 			if (post.readyState == 4 && post.status == 200) {
 				text = post.responseText
@@ -117,6 +120,7 @@ function deleteRoom(room,date){
 }
 //刷新基本操作
 function refresh(date){
+	date=formatDate(date)
 	post=getHttpObject();
 	url=base_url+"getOneDayRoomList"
 	post.open('Post', url, true);
@@ -132,8 +136,6 @@ function refresh(date){
 			now_date.lastChild.nodeValue=json_text["date"]
 			let image_ordered="static/images/ordered.png"
 			let image_disordered="static/images/no_ordered.png"
-			let test=document.getElementById("Room101")
-			test.src=image_ordered
 			for (let item in json_text){
 				if (item=="date"){
 					continue;
@@ -149,6 +151,19 @@ function refresh(date){
 			}
 		}
 	}
+}
+
+
+function formatDate(date){                    //格式化日期
+	date_list=date.split("-")
+
+	if (date_list[1].length<2)
+		date_list[1]="0"+date_list[1]
+	if (date_list[2].length<2)
+		date_list[2]="0"+date_list[2]
+
+	return String(date_list[0]+"-"+date_list[1]+"-"+date_list[2])
+
 }
 
 window.onload=function(){
