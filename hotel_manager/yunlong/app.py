@@ -1,170 +1,91 @@
 import json
 import re
+import dealdatebase as dd
 
-import pymysql
 from flask import Flask, request
-from flask import Flask,render_template
+from flask import Flask, render_template
+
 app = Flask(__name__)
-
-host="localhost"
-
-#user="root"
-#password="136614567977"
-
-user="gg"
-password="123456"
-
-
-database="yunlong"
-
-
-#得到所有已经插入的日期
-def get_alldate():
-    try:
-        conn = pymysql.connect(host=host, user=user, password=password, database=database)
-        cursor = conn.cursor()
-        date_list=[]
-        sql = "SELECT * FROM Room_list"
-        cursor.execute(sql)
-        # 获取所有记录列表
-        results = cursor.fetchall()
-        for row in results:
-            temp = re.findall(r'(.*)', str(row[0]))
-            date_list.append(temp[0])
-        return date_list
-    except Exception as e:
-        return "wrong"
-    finally:
-        cursor.close()
-        conn.close()
-
-# 插入房间
-def order_a_room(date,room):
-    try:
-        # 连接database
-        conn = pymysql.connect(host=host, user=user, password=password, database=database)
-        # 得到一个可以执行SQL语句的光标对象
-        cursor = conn.cursor()
-        sql = "INSERT INTO Room_list(date, Room"+room+") VALUES (%s,%s) ;"
-        cursor.execute(sql, [date,"ordered"])
-        # 提交事务
-        conn.commit()
-        return "right"
-    except Exception as e:
-        conn.rollback()
-        return "wrong"
-    finally:
-        cursor.close()
-        conn.close()
-
-#更新房间信息
-def update_room(date,room,type):
-    try:
-        # 连接database
-        conn = pymysql.connect(host=host, user=user, password=password, database=database)
-        # 得到一个可以执行SQL语句的光标对象
-        cursor = conn.cursor()
-        sql = "UPDATE Room_list SET Room"+room+" = '"+type+"' WHERE DATE= '"+date+"'";
-        print(sql)
-        cursor.execute(sql)
-        # 提交事务
-        conn.commit()
-        return "right"
-    except Exception as e:
-        conn.rollback()
-        return "wrong"
-    finally:
-        cursor.close()
-        conn.close()
-
-#得到一天的房间信息
-def getOneDayRoomList(date):
-    try:
-        # 连接database
-        conn = pymysql.connect(host=host, user=user, password=password, database=database)
-        # 得到一个可以执行SQL语句的光标对象
-        cursor = conn.cursor()
-        sql  = "SELECT * FROM Room_list where date=%s"
-        cursor.execute(sql,[date])
-        results = cursor.fetchall()
-        return list(results[0])
-    except Exception as e:
-        conn.rollback()
-        return "wrong"
-    finally:
-        cursor.close()
-        conn.close()
 
 
 @app.route('/')
 def hello_world():
     return render_template("Home.html")
 
+
 @app.route('/text')
 def Home_page():
     return "The test data"
 
-@app.route('/date',methods=['GET','POST'])
+
+@app.route('/date', methods=['GET', 'POST'])
 def date():
-    if request.method=='POST':
-        get_date=request.get_data().decode('utf-8')
+    if request.method == 'POST':
+        get_date = request.get_data().decode('utf-8')
         return get_date
 
-@app.route('/insert_room',methods=['GET','POST'])
+#点击预定时触发，作用是在两张表中都插入信息
+@app.route('/insert_room', methods=['GET', 'POST'])
 def insert_room():
-    if request.method=='POST':
-        get_date=request.get_data().decode('utf-8')
+    if request.method == 'POST':
+        get_date = request.get_data().decode('utf-8')
         json_date = json.loads(get_date)
         print(json_date)
+        room = json_date["Room"]
+        date = json_date["date"]
+        type = "ordered"
+        insert_result = ""
+        update_result = ""
+        date_list = dd.get_alldate()
 
-        room=json_date["Room"]
-        date=json_date["date"]
-        type="ordered"
+        order_result = dd.insertOneOrder(date, room)                                #插入一个订单
 
-        insert_result=""
-        update_result=""
-        date_list = get_alldate()
         if date not in date_list:
-            insert_result=order_a_room(date, room)
+            insert_result = dd.order_a_room(date, room)                             #大表数据库中插入一个
         else:
-            update_result=update_room(date, room, type)
+            update_result = dd.update_room(date, room, type)
 
-        if (insert_result=="right" or update_result=="right"):
+        if (insert_result == "right" or update_result == "right" or order_result == "right"):
             return "right"
         else:
             return "wrong"
 
-@app.route('/delete_room',methods=['GET','POST'])
+
+
+#点击删除房间的时候触发，将大表中信息删除，同时删除订单
+@app.route('/delete_room', methods=['GET', 'POST'])
 def delete_room():
-    if request.method=='POST':
-        get_date=request.get_data().decode('utf-8')
+    if request.method == 'POST':
+        get_date = request.get_data().decode('utf-8')
         json_date = json.loads(get_date)
         print(json_date)
 
-        room=json_date["Room"]
-        date=json_date["date"]
-        type="disordered"
+        room = json_date["Room"]
+        date = json_date["date"]
+        type = "disordered"
 
-        delete_result=""
-
-        date_list = get_alldate()
+        id = date.replace("-", "") + room
+        order_result = dd.delete_order(id)                               #删除订单
+        print("删除订单结果：" + order_result)
+        date_list = dd.get_alldate()
 
         if date not in date_list:
-            delete_result="wrong"
+            delete_result = "wrong"
         else:
-            delete_result=update_room(date, room, type)
+            delete_result = dd.update_room(date, room, type)            #更新大表房间信息
 
         return delete_result
 
-@app.route('/getOneDayRoomList',methods=['GET','POST'])
+
+@app.route('/getOneDayRoomList', methods=['GET', 'POST'])
 def getOneDayRoom():
-    if request.method=='POST':
-        get_date=request.get_data().decode('utf-8')
+    if request.method == 'POST':
+        get_date = request.get_data().decode('utf-8')
         json_date = json.loads(get_date)
         print(json_date)
-        date=json_date["date"]
-        if date in get_alldate():
-            result = getOneDayRoomList(date)
+        date = json_date["date"]
+        if date in dd.get_alldate():
+            result = dd.getOneDayRoomList(date)
             for i in range(len(result)):
                 if result[i] is None:
                     result[i] = "disorder"
@@ -204,6 +125,54 @@ def getOneDayRoom():
             room_list["Room302"] = "disordered"
             return room_list
 
+#这个按钮是用户点击详情之后触发的,查询数据库，返回一个订单的详细数据的json
+@app.route('/getOneorder', methods=['GET', 'POST'])
+def getOneorder():
+    orderDetail = {}
+    if request.method == 'POST':
+        get_date = request.get_data().decode('utf-8')
+        json_date = json.loads(get_date)
+        id = json_date["date"].replace("-", "") + json_date["room"]
+        orderIdList = dd.get_allorderid()
+
+        if id in orderIdList:
+            order=dd.getOneOrder(id)
+
+
+
+            #None空字符串
+            for key,value in order.items():
+                if value is None:
+                    order[key]=""
+
+            orderDetail["type"] = "ordered"
+            orderDetail["name"] = order["name"]
+            orderDetail["contact"] = order["contact"]
+            orderDetail["note"] = order["note"]
+            orderDetail["price"] = order["price"]
+        elif dd.judgeroom(json_date["date"],json_date["room"]) :
+            dd.insertOneOrder(json_date["date"],json_date["room"])
+            orderDetail["type"] = "ordered"
+            orderDetail["name"] = ""
+            orderDetail["contact"] = ""
+            orderDetail["note"] =""
+            orderDetail["price"] = ""
+        else:
+            orderDetail["type"] = "disordered"
+        return orderDetail
+
+
+#更新一个订单信息
+@app.route('/changeOneOrder', methods=['GET', 'POST'])
+def changeOneOrder():
+    if request.method == 'POST':
+        get_date = request.get_data().decode('utf-8')
+        json_date = json.loads(get_date)
+
+
+        type=dd.update_order(json_date["date"],json_date["room"],json_date["name"],json_date["contact"],json_date["price"],json_date["note"])
+        result={"type":type}
+        return result
 
 if __name__ == '__main__':
-       app.run(debug=True,host='0.0.0.0', port=80)  # 运行开始
+    app.run(debug=True, host='0.0.0.0', port=80)  # 运行开始
